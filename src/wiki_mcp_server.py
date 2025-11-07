@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     WIKIJS_API_KEY: Optional[str] = Field(default=None)  # Alternative name for token
     WIKIJS_USERNAME: Optional[str] = Field(default=None)
     WIKIJS_PASSWORD: Optional[str] = Field(default=None)
+    WIKIJS_LOCALE: str = Field(default="en")
     WIKIJS_MCP_DB: str = Field(default="./wikijs_mappings.db")
     LOG_LEVEL: str = Field(default="INFO")
     LOG_FILE: str = Field(default="wikijs_mcp.log")
@@ -96,11 +97,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class WikiJSClient:
     """Wiki.js GraphQL API client for handling requests."""
-    
+
     def __init__(self):
         self.base_url = settings.WIKIJS_API_URL.rstrip('/')
         self.client = httpx.AsyncClient(timeout=30.0)
         self.authenticated = False
+        self.locale = settings.WIKIJS_LOCALE
         
     async def authenticate(self) -> bool:
         """Set up authentication headers for GraphQL requests."""
@@ -329,7 +331,7 @@ async def wikijs_create_page(title: str, content: str, space_id: str = "", paren
             "editor": "markdown",
             "isPublished": True,
             "isPrivate": False,
-            "locale": "en",
+            "locale": wikijs.locale,
             "path": path,
             "publishEndDate": None,
             "publishStartDate": None,
@@ -441,7 +443,7 @@ async def wikijs_update_page(page_id: int, title: str = None, content: str = Non
             "editor": "markdown",
             "isPrivate": current_page.get("isPrivate", False),
             "isPublished": current_page.get("isPublished", True),
-            "locale": current_page.get("locale", "en"),
+            "locale": current_page.get("locale", wikijs.locale),
             "path": current_page["path"],
             "scriptCss": "",
             "scriptJs": "",
@@ -513,9 +515,9 @@ async def wikijs_get_page(page_id: int = None, slug: str = None) -> str:
             variables = {"id": page_id}
         elif slug:
             query = """
-            query($path: String!) {
+            query($path: String!, $locale: String!) {
                 pages {
-                    singleByPath(path: $path, locale: "en") {
+                    singleByPath(path: $path, locale: $locale) {
                         id
                         path
                         title
@@ -533,7 +535,7 @@ async def wikijs_get_page(page_id: int = None, slug: str = None) -> str:
                 }
             }
             """
-            variables = {"path": slug}
+            variables = {"path": slug, "locale": wikijs.locale}
         else:
             return json.dumps({"error": "Either page_id or slug must be provided"})
         
@@ -584,9 +586,9 @@ async def wikijs_search_pages(query: str, space_id: str = None) -> str:
         
         # GraphQL query for search (fixed - removed invalid suggestions subfields)
         search_query = """
-        query($query: String!) {
+        query($query: String!, $locale: String!) {
             pages {
-                search(query: $query, path: "", locale: "en") {
+                search(query: $query, path: "", locale: $locale) {
                     results {
                         id
                         title
@@ -599,8 +601,8 @@ async def wikijs_search_pages(query: str, space_id: str = None) -> str:
             }
         }
         """
-        
-        variables = {"query": query}
+
+        variables = {"query": query, "locale": wikijs.locale}
         
         response = await wikijs.graphql_request(search_query, variables)
         
@@ -1249,9 +1251,9 @@ async def wikijs_create_nested_page(title: str, content: str, parent_path: str, 
         
         # Check if parent exists
         parent_query = """
-        query($path: String!) {
+        query($path: String!, $locale: String!) {
             pages {
-                singleByPath(path: $path, locale: "en") {
+                singleByPath(path: $path, locale: $locale) {
                     id
                     path
                     title
@@ -1259,8 +1261,8 @@ async def wikijs_create_nested_page(title: str, content: str, parent_path: str, 
             }
         }
         """
-        
-        parent_response = await wikijs.graphql_request(parent_query, {"path": parent_path})
+
+        parent_response = await wikijs.graphql_request(parent_query, {"path": parent_path, "locale": wikijs.locale})
         parent_data = parent_response.get("data", {}).get("pages", {}).get("singleByPath")
         
         if not parent_data and create_parent_if_missing:
@@ -1276,7 +1278,7 @@ async def wikijs_create_nested_page(title: str, content: str, parent_path: str, 
                     current_path = part
                 
                 # Check if this level exists
-                check_response = await wikijs.graphql_request(parent_query, {"path": current_path})
+                check_response = await wikijs.graphql_request(parent_query, {"path": current_path, "locale": wikijs.locale})
                 existing = check_response.get("data", {}).get("pages", {}).get("singleByPath")
                 
                 if not existing:
@@ -1356,9 +1358,9 @@ async def wikijs_get_page_children(page_id: int = None, page_path: str = None) -
             parent_data = parent_response.get("data", {}).get("pages", {}).get("single")
         elif page_path:
             parent_query = """
-            query($path: String!) {
+            query($path: String!, $locale: String!) {
                 pages {
-                    singleByPath(path: $path, locale: "en") {
+                    singleByPath(path: $path, locale: $locale) {
                         id
                         path
                         title
@@ -1366,7 +1368,7 @@ async def wikijs_get_page_children(page_id: int = None, page_path: str = None) -
                 }
             }
             """
-            parent_response = await wikijs.graphql_request(parent_query, {"path": page_path})
+            parent_response = await wikijs.graphql_request(parent_query, {"path": page_path, "locale": wikijs.locale})
             parent_data = parent_response.get("data", {}).get("pages", {}).get("singleByPath")
         else:
             return json.dumps({"error": "Either page_id or page_path must be provided"})
@@ -1590,9 +1592,9 @@ async def wikijs_delete_page(page_id: int = None, page_path: str = None, remove_
             page_data = get_response.get("data", {}).get("pages", {}).get("single")
         elif page_path:
             get_query = """
-            query($path: String!) {
+            query($path: String!, $locale: String!) {
                 pages {
-                    singleByPath(path: $path, locale: "en") {
+                    singleByPath(path: $path, locale: $locale) {
                         id
                         path
                         title
@@ -1600,7 +1602,7 @@ async def wikijs_delete_page(page_id: int = None, page_path: str = None, remove_
                 }
             }
             """
-            get_response = await wikijs.graphql_request(get_query, {"path": page_path})
+            get_response = await wikijs.graphql_request(get_query, {"path": page_path, "locale": wikijs.locale})
             page_data = get_response.get("data", {}).get("pages", {}).get("singleByPath")
             if page_data:
                 page_id = page_data["id"]
@@ -1717,9 +1719,9 @@ async def wikijs_batch_delete_pages(
         if page_paths:
             for page_path in page_paths:
                 get_query = """
-                query($path: String!) {
+                query($path: String!, $locale: String!) {
                     pages {
-                        singleByPath(path: $path, locale: "en") {
+                        singleByPath(path: $path, locale: $locale) {
                             id
                             path
                             title
@@ -1727,7 +1729,7 @@ async def wikijs_batch_delete_pages(
                     }
                 }
                 """
-                get_response = await wikijs.graphql_request(get_query, {"path": page_path})
+                get_response = await wikijs.graphql_request(get_query, {"path": page_path, "locale": wikijs.locale})
                 page_data = get_response.get("data", {}).get("pages", {}).get("singleByPath")
                 if page_data:
                     pages_to_delete.append(page_data)
