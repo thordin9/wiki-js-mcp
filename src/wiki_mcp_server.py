@@ -114,7 +114,7 @@ class WikiJSClient:
         
         # Configure SSL verification
         # Respect WIKIJS_SSL_VERIFY setting - if False, always disable verification
-        verify_ssl: Union[bool, ssl.SSLContext, str] = settings.WIKIJS_SSL_VERIFY
+        verify_ssl: Union[bool, ssl.SSLContext] = settings.WIKIJS_SSL_VERIFY
         
         # Only configure custom CA bundle if SSL verification is enabled
         if settings.WIKIJS_SSL_VERIFY and settings.WIKIJS_CA_BUNDLE:
