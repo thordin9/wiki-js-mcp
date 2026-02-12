@@ -48,8 +48,12 @@ class Settings(BaseSettings):
     MCP_HTTP_PATH: str = Field(default="")  # If empty, choose based on transport
     MCP_HOST: str = Field(default="0.0.0.0")
     MCP_PORT: int = Field(default=8787)
-    WIKIJS_SSL_VERIFY: bool = Field(default=True)  # Enable/disable SSL verification
-    WIKIJS_CA_BUNDLE: Optional[str] = Field(default=None)  # Path to custom CA bundle
+    # SSL verification settings for HTTPS connections
+    # Set to False only for testing with self-signed certificates (not recommended for production)
+    WIKIJS_SSL_VERIFY: bool = Field(default=True)
+    # Path to custom CA bundle for self-signed certificates or custom Certificate Authorities
+    # Example: /etc/ssl/certs/ca-certificates.crt
+    WIKIJS_CA_BUNDLE: Optional[str] = Field(default=None)
     
     class Config:
         env_file = ".env"
@@ -126,7 +130,6 @@ class WikiJSClient:
         self.client = httpx.AsyncClient(timeout=30.0, verify=verify_ssl)
         self.authenticated = False
         self.locale = settings.WIKIJS_LOCALE
-
         
     async def authenticate(self) -> bool:
         """Set up authentication headers for GraphQL requests."""
