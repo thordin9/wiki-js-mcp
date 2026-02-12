@@ -287,6 +287,12 @@ POSTGRES_PASSWORD=your_secure_password_here
 WIKIJS_API_URL=http://localhost:3000
 WIKIJS_API_KEY=your_jwt_token_here
 
+# SSL Configuration (for HTTPS connections)
+# Set to false to disable SSL certificate verification (not recommended for production)
+WIKIJS_SSL_VERIFY=true
+# Path to custom CA bundle file for self-signed certificates or custom CAs
+# WIKIJS_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt
+
 # Alternative: Username/Password
 WIKIJS_USERNAME=your_username
 WIKIJS_PASSWORD=your_password
@@ -394,6 +400,10 @@ export LOG_LEVEL=DEBUG
 - **Database issues**: Remove `postgres_data/` and restart
 - **API permissions**: Ensure API key has admin privileges
 - **Python dependencies**: Run `./setup.sh` to reinstall
+- **SSL certificate errors**: For self-signed certificates or custom CAs:
+  - Set `WIKIJS_SSL_VERIFY=false` to disable verification (not recommended for production)
+  - Or set `WIKIJS_CA_BUNDLE=/path/to/ca-bundle.crt` to use a custom CA bundle
+  - Example: `WIKIJS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt` for system CA bundle
 
 ## 📚 Documentation
 
