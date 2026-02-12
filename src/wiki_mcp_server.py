@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     MCP_HTTP_PATH: str = Field(default="")  # If empty, choose based on transport
     MCP_HOST: str = Field(default="0.0.0.0")
     MCP_PORT: int = Field(default=8787)
+    WIKIJS_SSL_VERIFY: bool = Field(default=True)  # Enable/disable SSL verification
+    WIKIJS_CA_BUNDLE: Optional[str] = Field(default=None)  # Path to custom CA bundle
     
     class Config:
         env_file = ".env"
@@ -104,7 +106,14 @@ class WikiJSClient:
 
     def __init__(self):
         self.base_url = settings.WIKIJS_API_URL.rstrip('/')
-        self.client = httpx.AsyncClient(timeout=30.0)
+        
+        # Configure SSL verification
+        verify_ssl = settings.WIKIJS_SSL_VERIFY
+        if settings.WIKIJS_CA_BUNDLE:
+            # Use custom CA bundle if provided
+            verify_ssl = settings.WIKIJS_CA_BUNDLE
+        
+        self.client = httpx.AsyncClient(timeout=30.0, verify=verify_ssl)
         self.authenticated = False
         self.locale = settings.WIKIJS_LOCALE
         
