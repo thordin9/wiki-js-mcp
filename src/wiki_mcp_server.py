@@ -12,6 +12,7 @@ import hashlib
 import logging
 import ast
 import re
+import ssl
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Union
 from dataclasses import dataclass
@@ -108,14 +109,24 @@ class WikiJSClient:
         self.base_url = settings.WIKIJS_API_URL.rstrip('/')
         
         # Configure SSL verification
-        verify_ssl = settings.WIKIJS_SSL_VERIFY
+        verify_ssl: Union[bool, ssl.SSLContext] = settings.WIKIJS_SSL_VERIFY
         if settings.WIKIJS_CA_BUNDLE:
-            # Use custom CA bundle if provided
-            verify_ssl = settings.WIKIJS_CA_BUNDLE
+            # Use custom CA bundle if provided - create SSL context with custom CA
+            ca_bundle_path = settings.WIKIJS_CA_BUNDLE
+            if os.path.isfile(ca_bundle_path):
+                try:
+                    ssl_context = ssl.create_default_context(cafile=ca_bundle_path)
+                    verify_ssl = ssl_context
+                    logger.info(f"Using custom CA bundle: {ca_bundle_path}")
+                except ssl.SSLError as e:
+                    logger.error(f"Failed to load CA bundle {ca_bundle_path}: {e}. Falling back to default verification.")
+            else:
+                logger.warning(f"CA bundle file not found: {ca_bundle_path}. Falling back to default verification.")
         
         self.client = httpx.AsyncClient(timeout=30.0, verify=verify_ssl)
         self.authenticated = False
         self.locale = settings.WIKIJS_LOCALE
+
         
     async def authenticate(self) -> bool:
         """Set up authentication headers for GraphQL requests."""
